@@ -22,18 +22,12 @@ from keras import layers, models
 from keras.models import Sequential
 from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout, InputLayer
 
-
-
-# Initialize the Dash app
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP],suppress_callback_exceptions=True)
 
-# Load YOLO model for irrigation
-model = YOLO('yolov8n.pt')
+model = YOLO('./models/yolov8n.pt')
+model_pest = load_model('./models/ccmt5gb.h5')
+pest_csv_path = './data/pest_mapping.csv' 
 
-###### PEST DETECTION AND MAPPING
-#load model for pest detection
-model_pest = load_model('ccmt5gb.h5')
-pest_csv_path = 'pest_mapping.csv' #pest mapping input
 pest_solutions_df = pd.read_csv(pest_csv_path)
 class_names = [
     'anthracnose-cashew', 'bacterial blight-cassava', 'brown spot-cassava',
@@ -45,26 +39,23 @@ class_names = [
     'septoria leaf spot-tomato', 'streak virus-maize', 'verticillium wilt-tomato'
 ]
 
-# Function to preprocess the uploaded image
 def pest_preprocess_image(image_path):
-    img = image.load_img(image_path, target_size=(150, 150))  # Resize to match model input
+    img = image.load_img(image_path, target_size=(150, 150))
     img_array = image.img_to_array(img)
     img_array = np.expand_dims(img_array, axis=0)
-    img_array /= 255.0  # Normalize the image
+    img_array /= 255.0 
     return img_array
 
-# Function to predict the pest/disease class
 def pest_predict_pest(image_path):
     img = pest_preprocess_image(image_path)
     predictions = model_pest.predict(img)
-    predicted_class = np.argmax(predictions, axis=1)  # Get the index of the class with the highest probability
+    predicted_class = np.argmax(predictions, axis=1)
     return predicted_class[0]
 
-# Function to map the predicted class to a solution from the CSV
 def get_solution_for_class(class_index):
     class_name = class_names[class_index]
 
-    # Assuming your CSV has 'Class' column for the class names and 'Solution' column for corresponding solutions
+
     solution_row = pest_solutions_df[pest_solutions_df['Diseases'] == class_name]
     if not solution_row.empty:
         solution = solution_row['OrganicPrevention'].values[0]
@@ -72,16 +63,12 @@ def get_solution_for_class(class_index):
     else:
         return "Solution not found for this class."
 
-# Function to process user-uploaded image and return class and solution
 def pest_process_user_image(image_path):
     if os.path.exists(image_path):
-        # Predict the pest/disease class
         predicted_class = pest_predict_pest(image_path)
 
-        # Get the corresponding pest/disease name
         class_name = class_names[predicted_class]
 
-        # Get the solution for the predicted class
         solution = get_solution_for_class(predicted_class)
 
         result = {
@@ -93,10 +80,7 @@ def pest_process_user_image(image_path):
     else:
         return {"error": "Image not found. Please upload a valid image."}
 
-
-
-######SOIL HEALTH ASSESSMENT
-model_path = 'soil_health_model.pkl'
+model_path = './models/soil_health_model.pkl'
 rf_classifier = joblib.load(model_path)
 
 default_feature_values = {
@@ -129,7 +113,6 @@ def predict_from_user_input(n_value, p_value, k_value, ph_value):
     except Exception as e:
         return f"Error processing the input: {str(e)}"
 
-####FARMER"S INFO
 reader = easyocr.Reader(['en'])
 
 def preprocess_image(image_path):
@@ -145,7 +128,7 @@ def preprocess_image(image_path):
 
 def extract_id_details(image_path):
     preprocessed_image = preprocess_image(image_path)
-    temp_image_path = "temp_preprocessed_image.jpg"
+    temp_image_path = "./images/temp_preprocessed_image.jpg"
     cv2.imwrite(temp_image_path, preprocessed_image)
     results = reader.readtext(temp_image_path, detail=0)
     details_text = "\n".join(results)
@@ -190,7 +173,6 @@ app.layout = html.Div(
             ],
         ),
 
-        # Tabs for different sections
         dcc.Tabs(
             id='tabs',
             value='tab-1',
@@ -207,12 +189,10 @@ app.layout = html.Div(
             }
         ),
 
-        # Content will be rendered based on tab selection
         html.Div(id='tabs-content', style={'marginTop': '30px'})
     ]
 )
 
-# Callback to switch between tabs
 @app.callback(
     Output('tabs-content', 'children'),
     [Input('tabs', 'value')]
@@ -322,7 +302,6 @@ def render_content(tab):
             ]
         )
 
-# Callback to display Soil Health section when button is clicked
 @app.callback(
     Output('soil-health-section', 'style'),
     [Input('show-soil-health-btn', 'n_clicks')],
@@ -331,16 +310,14 @@ def render_content(tab):
 def show_soil_health_section(n_clicks):
     return {'display': 'block'}
 
-# Callback to handle manual input and CSV upload for soil health prediction
 @app.callback(
     Output('soil-health-results', 'children'),
     [Input('submit-manual-btn', 'n_clicks'), Input('upload-soil-csv', 'contents')],
     [State('input-n', 'value'), State('input-p', 'value'), State('input-k', 'value'), State('input-ph', 'value'), State('upload-soil-csv', 'filename')]
 )
-##SOIL HEALTH ANALYSIS
+
 def analyze_soil_health(n_clicks, csv_content, n_value, p_value, k_value, ph_value, csv_filename):
     if csv_content:
-        # Decode the CSV content and read it into a DataFrame
         csv_data = base64.b64decode(csv_content.split(',')[1])
         soil_data = pd.read_csv(io.StringIO(csv_data.decode('utf-8')))
         predictions = predict_from_csv(soil_data)
@@ -349,7 +326,6 @@ def analyze_soil_health(n_clicks, csv_content, n_value, p_value, k_value, ph_val
             html.P(", ".join(predictions), style={'color': 'white'})
         ])
     elif n_clicks:
-        # If manual input is provided
         if all([n_value, p_value, k_value, ph_value]):
             prediction = predict_from_user_input(n_value, p_value, k_value, ph_value)
             return html.H5(f"The soil is predicted to be: {prediction}", style={'color': 'white'})
@@ -357,9 +333,6 @@ def analyze_soil_health(n_clicks, csv_content, n_value, p_value, k_value, ph_val
             return html.H5("Please provide valid N, P, K, and pH values.", style={'color': 'red'})
     return ""
 
-
-###IRRIGATION
-# Function to detect pests
 def detect_pests(image_path):
     image = cv2.imread(image_path)
     results = model.predict(source=image)
@@ -374,24 +347,20 @@ def detect_pests(image_path):
             break
     return pests_detected
 
-# Function to analyze soil health
 def analyze_soil(soil_data):
     avg_humidity = soil_data['Humidity'].mean()
     avg_temperature = soil_data['Temperature'].mean()
     avg_rainfall = soil_data['Rainfall'].mean()
 
-    if avg_humidity < 30 and avg_rainfall < 5:  # Example thresholds
-        return True  # Need irrigation non-fertile
+    if avg_humidity < 30 and avg_rainfall < 5:
+        return True 
     else:
-        return False  # No irrigation needed fertile
+        return False 
 
-# Simulated function to control irrigation system
 def water_plants(duration=10):
-    time.sleep(duration)  # Simulate watering duration
+    time.sleep(duration) 
     return "Watering complete."
 
-
-# Callback to display Smart Irrigation section when button is clicked
 @app.callback(
     Output('irrigation-section', 'style'),
     [Input('show-irrigation-btn', 'n_clicks')],
@@ -400,7 +369,6 @@ def water_plants(duration=10):
 def show_irrigation_section(n_clicks):
     return {'display': 'block'}
 
-# Callback to handle image and CSV upload and process the irrigation system
 @app.callback(
     [Output('output-image', 'children'), Output('output-csv-name', 'children'), Output('irrigation-results', 'children')],
     [Input('upload-image', 'contents'), Input('upload-csv', 'contents')],
@@ -408,17 +376,12 @@ def show_irrigation_section(n_clicks):
 )
 def handle_inputs(image_content, csv_content, image_filename, csv_filename):
     if image_content and csv_content:
-        # Decode the image content
         image_data = base64.b64decode(image_content.split(',')[1])
-        image_path = "uploaded_image.jpg"
+        image_path = "./images/uploaded_image.jpg"
         with open(image_path, "wb") as f:
             f.write(image_data)
-
-        # Decode the CSV content and read it into a DataFrame
         csv_data = base64.b64decode(csv_content.split(',')[1])
         soil_data = pd.read_csv(io.StringIO(csv_data.decode('utf-8')))
-
-        # Pest detection
         pests_detected = detect_pests(image_path)
         irrigation_needed = analyze_soil(soil_data)
 
@@ -436,9 +399,6 @@ def handle_inputs(image_content, csv_content, image_filename, csv_filename):
         )
     return "", "", "Please upload both image and CSV."
 
-
-
-# Show Farmer's Information Hub when the button is clicked
 @app.callback(
     Output('farmer-info-section', 'style'),
     Input('show-farmer-info-btn', 'n_clicks')
@@ -448,7 +408,6 @@ def toggle_farmer_info_section(n_clicks):
         return {'display': 'block', 'marginTop': '50px', 'color': 'white'}
     return {'display': 'none'}
 
-# Callback to handle image upload and extract ID details
 @app.callback(
     Output('output-id-details', 'children'),
     Input('upload-image-1', 'contents'),
@@ -456,16 +415,13 @@ def toggle_farmer_info_section(n_clicks):
 )
 def update_output(content, filename):
     if content is not None:
-        # Save the image temporarily and extract details
         image_path = save_image(content, filename)
         details_text = extract_id_details(image_path)
         details_text_line=details_text.splitlines()
-        # Convert the image back to base64 for displaying in Dash
         _, img_str = content.split(',')
         img_data = base64.b64decode(img_str)
         encoded_image = base64.b64encode(img_data).decode('utf-8')
 
-        # Display the uploaded image and extracted details
         return html.Div([
             html.Img(src=f"data:image/jpeg;base64,{encoded_image}", style={'width': '50%', 'height': 'auto', 'marginBottom': '20px'}),
             #html.P(f"{details_text_line}")
@@ -478,25 +434,19 @@ def update_output(content, filename):
 
     return "No image uploaded."
 
-
-###PEST DETECTION
-# Callback to handle image upload and prediction
 @app.callback(Output('output-image-upload', 'children'),
               [Input('upload-image-2', 'contents')],
               [State('upload-image-2', 'filename')])
 def update_output_image(contents, filename):
     if contents is not None:
-        # Save the uploaded image to a temporary location
         content_type, content_string = contents.split(',')
         decoded = base64.b64decode(content_string)
         image_path = f'temp_{filename}'
         with open(image_path, 'wb') as f:
             f.write(decoded)
 
-        # Perform pest prediction on the uploaded image
         result = pest_process_user_image(image_path)
         
-        # Remove the temporary image after prediction
         os.remove(image_path)
 
         if 'error' in result:
