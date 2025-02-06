@@ -1,7 +1,3 @@
-Here is the corrected version of your README template:
-
----
-
 # Soil and Crop Disease Analysis System
 
 ## Project Overview
@@ -46,7 +42,7 @@ For GPU-based processing (optional for faster computation, especially for diseas
 
 bash
 Copy code
-git clone https://github.com/your-repo-url.git
+git clone https://github.com/ISHAAN-KKR/farmeasy.git
 Navigate to the project directory:
 
 bash
